@@ -43,4 +43,5 @@
 char addUser(uint16_t userID);
 char deleteAllUsers();
 uint16_t fetchNumberOfUsers();
+uint16_t matchFingerPrintToId();
 void resetDevice();

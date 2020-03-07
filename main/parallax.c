@@ -144,7 +144,9 @@ char deleteAllUsers()
   decorateFunctions("Starting to delete all users");
 
   char command[8];
+  char rx_buff[8];
   memset(command, 0, sizeof(command));
+  memset(rx_buff, 0, sizeof(rx_buff));
 
   command[0] = CMD_GUARD;
   command[1] = CMD_DELETE_ALL_USERS;
@@ -184,20 +186,18 @@ char deleteAllUsers()
   return getResponse(rx_buff);
 }
 
-
-// Fetch how many users we have
-uint16_t fetchNumberOfUsers()
+// compare 1:1 (check who is trying to identifiy) 
+uint16_t matchFingerPrintToId()
 {
-  decorateFunctions("Starting to fetch number of users");
+  decorateFunctions("Starting 1:N compare");
 
   char command[8];
-  char resp[8];
-
+  char rx_buff[8];
   memset(command, 0, sizeof(command));
-  memset(resp, 0, sizeof(command));
+  memset(rx_buff, 0, sizeof(rx_buff));
 
   command[0] = CMD_GUARD;
-  command[1] = CMD_GET_USERS_COUNT;
+  command[1] = CMD_SCAN_COMPARE_1_TO_N;
   command[2] = 0;
   command[3] = 0;
   command[4] = 0;
@@ -216,23 +216,31 @@ uint16_t fetchNumberOfUsers()
   validateResponse(txBytes, command);
 
   //read the response and check the status 
-  int rxBytes = uart_read_bytes(UART_NUM_1, (uint8_t*)resp, CMD_LEN, 0);    // For some reason the write API use char
-                                                                            // and the read api uses uint8_t... fix it here    
+  int rxBytes = uart_read_bytes(UART_NUM_1, (uint8_t*)rx_buff, CMD_LEN, 1000 / portTICK_PERIOD_MS); // For some reason the write API use char
+                                                                                                    // and the read api uses uint8_t... fix it here    
                                                                             
   // Validate both len and checksum
-  validateResponse(rxBytes, resp);
-  printPacket(resp, "RX:  ");
-
-  if (getResponse(resp) != ACK_SUCCESS)
+  validateResponse(rxBytes, rx_buff);
+  printPacket(rx_buff, "RX:  ");
+  printf("\nuserdId = %d\n", rx_buff[2] << 8 |   rx_buff[3]);
+  
+  /*
+  if (getResponse(rx_buff) != ACK_SUCCESS)
   {
-    char response = getResponse(resp);
+    char response = getResponse(rx_buff);
     printf("Response == %d\n", response);
   }
-
-  decorateFunctions("done fetching number of users");
+*/
+  decorateFunctions("done 1:N compare");
   
-  //TODO: fix this - it's wrong!
   return getResponse(rx_buff);
+
+}
+
+// Fetch how many users we have
+uint16_t fetchNumberOfUsers()
+{
+  return 0;;
 }
 
 void resetDevice()

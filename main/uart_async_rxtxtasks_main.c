@@ -52,8 +52,11 @@ static void tx_task(void *arg)
 {
 	
  	 resetDevice();
-	 deleteAllUsers(); 
-   addUser(13); 
+
+   //matchFingerPrintToId();
+
+   deleteAllUsers(); 
+   //addUser(13); 
    //fetchNumberOfUsers(); 
    while (1) {
    }
