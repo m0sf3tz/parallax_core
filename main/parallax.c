@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "string.h"
 #include "driver/uart.h"
+#include "driver/gpio.h"
 
 #include "parallax.h"
 
@@ -44,11 +45,11 @@ static void printPacket(char * command, const char * start_message)
 
 // Sanitize response from device, verify checksum + len
 // Fail hard in error condition
-static void  validateResponse(int bytes_len, char * packet)
+static int validateResponse(int bytes_len, char * packet)
 {
   if (bytes_len != RESPONSE_LEN)
   {
-    printf("Faled to validate response len, expected %d - got %d", RESPONSE_LEN, bytes_len);
+    printf("Faled to validate response len, expected %d - got %d \n", RESPONSE_LEN, bytes_len);
     goto reset;
   }
 
@@ -60,14 +61,14 @@ static void  validateResponse(int bytes_len, char * packet)
     goto reset;
   }
   
-  return;
+  return true;
 
 reset:
   //give some time for the printf to drain before resetting
-  printf("packet is... \n");
   printPacket(packet, "FAILED PACKET:   ");
-  vTaskDelay(1000 / portTICK_PERIOD_MS);
-  esp_restart();
+  printf("...resetting fingerprint device...\n");
+  resetDevice();
+  return false;
 }
 
 
@@ -91,7 +92,9 @@ char addUser(uint16_t userId)
   for(i = 0; i < 3; i++)
   {
     char command[8];
+    char rx_buff[8];
     memset(command, 0, sizeof(command));
+    memset(rx_buff, 0, sizeof(rx_buff));
 
     command[0] = CMD_GUARD;
     command[1] = (i + 1); //CMD_ADD_FINGERPRINT_1 starts at 1, I starts at 1
@@ -109,25 +112,24 @@ char addUser(uint16_t userId)
     // the uart-core is not getting drained 
     // we will simply restart if we every get to this positon - recovering is too hard
     int txBytes = uart_write_bytes(UART_NUM_1, command, CMD_LEN); 
-
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-    // We know that the chechsum is correct (since we computed it locally)
-    // We will just use this function for checking we sent out all our command
-    validateResponse(8, command);
-
+    
     //read the response and check the status 
     int rxBytes = uart_read_bytes(UART_NUM_1, (uint8_t*)rx_buff, CMD_LEN, 1000 / portTICK_PERIOD_MS); // For some reason the write API use char
                                                                               // and the read api uses uint8_t... fix it here    
                                                                               
     // Validate both len and checksum
-    validateResponse(rxBytes, rx_buff);
+    if (!validateResponse(rxBytes, rx_buff))
+    {
+      return false;
+    }
+    
     printPacket(rx_buff, "RX:  ");
 
     if (getResponse(rx_buff) != ACK_SUCCESS)
     {
       char response = getResponse(rx_buff);
-      printf("Response == %d\n", response);
+      printf("Response == %d \n", response);
     }
   }
   decorateFunctions("Done adding user");
@@ -164,8 +166,8 @@ char deleteAllUsers()
   validateResponse(txBytes, command);
 
   //read the response and check the status 
-  int rxBytes = uart_read_bytes(UART_NUM_1, (uint8_t*)rx_buff, CMD_LEN, 0); // For some reason the write API use char
-                                                                            // and the read api uses uint8_t... fix it here    
+  int rxBytes = uart_read_bytes(UART_NUM_1, (uint8_t*)rx_buff, CMD_LEN, 1000 / portTICK_PERIOD_MS); // For some reason the write API use char
+                                                                                                    // and the read api uses uint8_t... fix it here    
                                                                             
   // Validate both len and checksum
   validateResponse(rxBytes, rx_buff);
@@ -231,4 +233,16 @@ uint16_t fetchNumberOfUsers()
   
   //TODO: fix this - it's wrong!
   return getResponse(rx_buff);
+}
+
+void resetDevice()
+{
+	 gpio_set_level(22, 0 ) ;
+	 vTaskDelay(pdMS_TO_TICKS(3000));
+   gpio_set_level(22, 1 ) ;	
+   vTaskDelay(pdMS_TO_TICKS(1000)); //give time for the device to boot
+   // Yikes.. fingerprint module seems to send out a dummy byte on reset (power slurp being down TX?)
+   // Drain RX buf...
+   char byteBlackHole[BLACK_HOLE_BYTES];
+   uart_read_bytes(UART_NUM_1, (uint8_t*)byteBlackHole, BLACK_HOLE_BYTES, 0);  
 }

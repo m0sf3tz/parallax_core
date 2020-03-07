@@ -38,6 +38,9 @@
 
 #define RX_BUF_LEN (8)
 
+#define BLACK_HOLE_BYTES 32
+
 char addUser(uint16_t userID);
 char deleteAllUsers();
 uint16_t fetchNumberOfUsers();
+void resetDevice();

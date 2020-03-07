@@ -19,6 +19,7 @@
 
 //static const int RX_BUF_SIZE = 1024;
 
+#define PIN (1 << 22)
 #define TXD_PIN (GPIO_NUM_4)
 #define RXD_PIN (GPIO_NUM_5)
 
@@ -45,12 +46,15 @@ int sendData(const char* logName, const char* data)
     return txBytes;
 }
 
+
+extern void resetDevice();
 static void tx_task(void *arg)
 {
-
-   deleteAllUsers(); 
+	
+ 	 resetDevice();
+	 deleteAllUsers(); 
    addUser(13); 
-   fetchNumberOfUsers(); 
+   //fetchNumberOfUsers(); 
    while (1) {
    }
 }
@@ -59,5 +63,24 @@ static void tx_task(void *arg)
 void app_main(void)
 {
     init();
-    xTaskCreate(tx_task, "uart_tx_task", 1024*2, NULL, configMAX_PRIORITIES-1, NULL);
+
+
+    gpio_config_t io_conf;
+    //disable interrupt
+    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
+    //set as output mode
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    //bit mask of the pins that you want to set,e.g.GPIO18/19
+    io_conf.pin_bit_mask = PIN;
+    //disable pull-down mode
+    io_conf.pull_down_en = 0;
+    //disable pull-up mode
+    io_conf.pull_up_en = 0;
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);
+     
+	  gpio_set_level(22, 1);
+    
+		//while(1);
+		xTaskCreate(tx_task, "RESET", 1024*2, NULL, configMAX_PRIORITIES-1, NULL);
 }
