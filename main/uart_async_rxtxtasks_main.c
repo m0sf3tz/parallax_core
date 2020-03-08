@@ -19,50 +19,8 @@
 
 //static const int RX_BUF_SIZE = 1024;
 
-#define PIN (1 << 22)
-#define TXD_PIN (GPIO_NUM_4)
-#define RXD_PIN (GPIO_NUM_5)
-
-#define GPIO_INPUT_IO_1     36
-#define GPIO_INPUT_PIN_SEL  (1ULL<<GPIO_INPUT_IO_1)
-#define ESP_INTR_FLAG_DEFAULT 0
 
 
-static xQueueHandle gpio_evt_queue = NULL;
-static void IRAM_ATTR gpio_isr_handler(void* arg)
-{
-    uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
-    gpio_intr_disable(gpio_num);
-}
-
-static void gpio_task_example(void* arg)
-{
-    uint32_t io_num;
-    for(;;) {
-        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
-            vTaskDelay(1000 / portTICK_RATE_MS);
-            printf("Enabling interrupt again..\n");
-            gpio_intr_enable(io_num);
-        }
-    }
-}
-
-void init(void) {
-    const uart_config_t uart_config = {
-        .baud_rate = 19200,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
-    };
-    // We won't use a buffer for sending data.
-    uart_driver_install(UART_NUM_1, 1024, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_1, &uart_config);
-    uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-}
 
 int sendData(const char* logName, const char* data)
 {
@@ -89,7 +47,7 @@ static void tx_task(void *arg)
 }
 
 
-
+/*
 void gpio_init()
 {
   //
@@ -125,12 +83,6 @@ void gpio_init()
   io_conf.pull_down_en = 0;
   gpio_config(&io_conf);
 
-
-  //create a queue to handle gpio event from isr
-  gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-  //start gpio task
-  xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
-
   //install gpio isr service
   gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
   //hook isr handler for specific gpio pin
@@ -138,15 +90,29 @@ void gpio_init()
 
 }
 
-
+*/
 
 
 void app_main(void)
 {
-    init();
-    gpio_init();
-
     
-		//while(1);
-		xTaskCreate(tx_task, "RESET", 1024*2, NULL, configMAX_PRIORITIES-1, NULL);
+	xTaskCreate(parallax_thread, "parallax_core", 4096, NULL, configMAX_PRIORITIES-1, NULL);
+
+  while(parallaxCoreReady == 0)
+  {
+   portYIELD();
+  }
+
+
+   commandQ_parallax_t qCommand;
+   memset(&qCommand, 0, sizeof(qCommand));
+    
+   //qCommand.command = PARALLAX_ADD_USER;
+   //qCommand.id      = 12;
+   //parallax_thread_gate(&qCommand);
+
+   qCommand.command = PARALLAX_CMP_USER;
+   int ret = parallax_thread_gate(&qCommand);
+   printf("%d \n", ret);
+
 }

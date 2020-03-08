@@ -40,8 +40,24 @@
 
 #define BLACK_HOLE_BYTES 32
 
+
+#define PARALLAX_ADD_USER 0
+#define PARALLAX_CMP_USER 1
+
+typedef struct{
+  uint32_t command;
+  uint32_t id;
+}commandQ_parallax_t;
+
+
+extern QueueHandle_t parallaxCommandQ, parallaxCommandQ_res;
+extern int parallaxCoreReady;
+
 char addUser(uint16_t userID);
+static  int addUserStateMachine(uint16_t user, int state);
 char deleteAllUsers();
 uint16_t fetchNumberOfUsers();
 uint16_t matchFingerPrintToId();
 void resetDevice();
+int parallax_thread_gate(commandQ_parallax_t * cmd);
+void parallax_thread(const void * ptr);
